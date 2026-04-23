@@ -2,7 +2,8 @@
 let capturedPhotos = []; 
 let selectedOrder = []; 
 let stream = null;
-let currentFrame = "classic";
+let currentLayout = "1_4";    // 프레임 구조 (기본: 세로 4컷)
+let currentTheme = "classic"; // 프레임 디자인 (기본: 클래식)
 let bgColor = "#ffffff";
 let bgImage = null;
 let stickers = [];
@@ -255,76 +256,82 @@ toDecorBtn.addEventListener("click", () => {
 });
 
 // ── PAGE 3: DECORATE ──
-// 1. 사진 위치 완전 고정 (어떤 프레임이든 사진 위치는 불변)
-const FIXED_LAYOUT = { padding: 20, gap: 10, bottomPad: 80, radius: 4 };
+// 1. 레이아웃 (구조) 정의 (pickmem 에셋 기준)
+const LAYOUTS = {
+  "1_4": { cols: 1, rows: 4, mask: "assets/frame/1_4.png", max: 4 },
+  "2_2": { cols: 2, rows: 2, mask: "assets/frame/2_2.png", max: 4 },
+  "1_2": { cols: 1, rows: 2, mask: "assets/frame/1_2.png", max: 2 }
+};
 
-// 2. PNG 오버레이 방식 프리셋
-const FRAMES = {
+// 2. 테마 (디자인) 정의
+const THEMES = {
   classic: { defaultBg: "#ffffff", overlaySrc: null },
   minimal: { defaultBg: "#1a1a2e", overlaySrc: "frames/minimal_overlay.png" },
   film: { defaultBg: "#f59e0b", overlaySrc: "frames/film_overlay.png" },
   polaroid: { defaultBg: "#e5e7eb", overlaySrc: "frames/polaroid_overlay.png" },
   scrap: { defaultBg: "#e0e7ff", overlaySrc: "frames/scrap_overlay.png" }
 };
-const frameImages = {};
 
-function getSlots() {
-  const p = FIXED_LAYOUT.padding, g = FIXED_LAYOUT.gap;
-  const slotW = W - p * 2;
-  const slotH = (H - p - FIXED_LAYOUT.bottomPad - g * 3) / 4;
-  return Array.from({ length: 4 }, (_, i) => ({
-    x: p, y: p + i * (slotH + g), w: slotW, h: slotH, idx: i,
-  }));
-}
+const preloadedImages = {};
 
-// 3. 파일 누락 방지 (예외 처리)
-function preloadFrames() {
-  Object.keys(FRAMES).forEach(key => {
-    const src = FRAMES[key].overlaySrc;
-    if (src) {
+// 3. 자산 동시 로드 엔진
+function preloadAssets() {
+  Object.values(LAYOUTS).forEach(l => {
+    if (l.mask) {
       const img = new Image();
-      img.onload = () => { frameImages[key] = img; };
-      img.onerror = () => { 
-        console.warn(`[SNAP] 프레임 로드 실패 (기본색으로 대체): ${src}`);
-        frameImages[key] = null; // 파일이 없어도 뻗지 않음
-      };
-      img.src = src;
+      img.onload = () => { preloadedImages[l.mask] = img; };
+      img.src = l.mask;
+    }
+  });
+  Object.values(THEMES).forEach(t => {
+    if (t.overlaySrc) {
+      const img = new Image();
+      img.onload = () => { preloadedImages[t.overlaySrc] = img; };
+      img.onerror = () => { preloadedImages[t.overlaySrc] = null; };
+      img.src = t.overlaySrc;
     }
   });
 }
+preloadAssets();
 
-preloadFrames();
-function roundRect(c, x, y, w, h, r) {
-  if (r <= 0) { c.beginPath(); c.rect(x, y, w, h); return; }
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.lineTo(x + w - r, y);
-  c.quadraticCurveTo(x + w, y, x + w, y + r);
-  c.lineTo(x + w, y + h - r);
-  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  c.lineTo(x + r, y + h);
-  c.quadraticCurveTo(x, y + h, x, y + h - r);
-  c.lineTo(x, y + r);
-  c.quadraticCurveTo(x, y, x + r, y);
-  c.closePath();
+// 4. 동적 슬롯 계산 엔진
+function getSlots() {
+  const layout = LAYOUTS[currentLayout];
+  const p = 20, g = 10, bottomPad = 80;
+  const usableW = W - (p * 2);
+  const usableH = H - p - bottomPad;
+  const slotW = (usableW - (g * (layout.cols - 1))) / layout.cols;
+  const slotH = (usableH - (g * (layout.rows - 1))) / layout.rows;
+
+  let slots = [];
+  let idx = 0;
+  for (let r = 0; r < layout.rows; r++) {
+    for (let c = 0; c < layout.cols; c++) {
+      if (idx >= layout.max) break;
+      slots.push({ x: p + c * (slotW + g), y: p + r * (slotH + g), w: slotW, h: slotH, idx: idx });
+      idx++;
+    }
+  }
+  return slots;
 }
 
 function drawFrame() {
   const { canvas, ctx } = getCanvas();
   if (!canvas || !ctx) return;
-  const f = FRAMES[currentFrame];
+  
+  const layout = LAYOUTS[currentLayout];
+  const theme = THEMES[currentTheme];
 
   ctx.clearRect(0, 0, W, H);
 
-  // 1. 배경색 (파일이 없으면 이 색상으로 대체됨)
-  ctx.fillStyle = bgColor !== "#ffffff" ? bgColor : f.defaultBg;
-  roundRect(ctx, 0, 0, W, H, FIXED_LAYOUT.radius);
+  // [Layer 1] 배경색 및 이미지
+  ctx.fillStyle = bgColor !== "#ffffff" ? bgColor : theme.defaultBg;
+  roundRect(ctx, 0, 0, W, H, 4);
   ctx.fill();
 
-  // 2. 사용자 업로드 배경 이미지
   if (bgImage) {
     ctx.save();
-    roundRect(ctx, 0, 0, W, H, FIXED_LAYOUT.radius);
+    roundRect(ctx, 0, 0, W, H, 4);
     ctx.clip();
     const scale = Math.max(W / bgImage.width, H / bgImage.height);
     const dw = bgImage.width * scale, dh = bgImage.height * scale;
@@ -332,13 +339,14 @@ function drawFrame() {
     ctx.restore();
   }
 
-  // 3. 고정된 위치에 4컷 사진 넣기
+  // [Layer 2] 동적 사진 격자
   const slots = getSlots();
   slots.forEach((s, i) => {
     ctx.save();
     ctx.beginPath();
-    roundRect(ctx, s.x, s.y, s.w, s.h, FIXED_LAYOUT.radius);
+    roundRect(ctx, s.x, s.y, s.w, s.h, 4);
     ctx.clip();
+    
     const photoIdx = selectedOrder[i];
     const img = capturedPhotos[photoIdx];
     if (img) {
@@ -352,19 +360,23 @@ function drawFrame() {
     ctx.restore();
   });
 
-  // 4. [예외 처리 강화] 프레임 PNG 덮어쓰기
-  if (f.overlaySrc && frameImages[currentFrame]) {
-    try {
-      ctx.drawImage(frameImages[currentFrame], 0, 0, W, H);
-    } catch (e) {
-      console.error("[SNAP] 오버레이 렌더링 에러:", e);
-    }
+  // [Layer 3] pickmem 구조 마스크 덮기
+  if (layout.mask && preloadedImages[layout.mask]) {
+    try { ctx.drawImage(preloadedImages[layout.mask], 0, 0, W, H); } catch (e) {}
   }
 
-  // 5. 스티커 및 텍스트
+  // [Layer 4] 디자인 오버레이 덮기
+  if (theme.overlaySrc && preloadedImages[theme.overlaySrc]) {
+    try { ctx.drawImage(preloadedImages[theme.overlaySrc], 0, 0, W, H); } catch (e) {}
+  }
+
+  // [Layer 5] 스티커 및 텍스트 렌더링
   stickers.forEach((st) => {
     ctx.save();
-    if (st.emoji) {
+    if (st.type === "image" && loadedStickerImgs[st.src]) {
+      const img = loadedStickerImgs[st.src];
+      ctx.drawImage(img, st.x - st.size / 2, st.y - st.size / 2, st.size, st.size);
+    } else if (st.emoji) {
       ctx.font = `${st.size}px serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -372,7 +384,7 @@ function drawFrame() {
     }
     if (st.text) {
       ctx.font = "bold 16px Nunito,sans-serif";
-      ctx.fillStyle = (f.defaultBg === "#1a1a2e" || f.defaultBg === "#f59e0b") ? "#fff" : "#222";
+      ctx.fillStyle = (theme.defaultBg === "#1a1a2e" || theme.defaultBg === "#f59e0b") ? "#fff" : "#222";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(st.text, st.x, st.y);
@@ -385,7 +397,7 @@ document.querySelectorAll(".frame-btn").forEach((btn) => {
   btn.addEventListener("click", function () {
     document.querySelectorAll(".frame-btn").forEach((b) => b.classList.remove("active"));
     this.classList.add("active");
-    currentFrame = this.dataset.frame;
+    currentTheme = this.dataset.frame; // 테마 변수로 수정
     drawFrame();
   });
 });
@@ -659,7 +671,8 @@ restartBtn.addEventListener("click", () => {
   stickers = [];
   bgImage = null;
   bgColor = "#ffffff";
-  currentFrame = "classic";
+  currentLayout = "1_4";
+  currentTheme = "classic";
   if (stream) stopCamera();
   document.querySelectorAll(".frame-btn").forEach((b) => b.classList.remove("active"));
   document.querySelector('[data-frame="classic"]').classList.add("active");
@@ -668,6 +681,54 @@ restartBtn.addEventListener("click", () => {
   renderDots();
   goToStep(1);
 });
+// ── PICKMEM 스티커 에셋 연동 (자동화 버전) ──
+let loadedStickerImgs = {}; 
+
+async function initStickerUI() {
+  const stickerRow = document.querySelector(".sticker-row");
+  if (!stickerRow) return;
+  stickerRow.innerHTML = "로딩중..."; 
+
+  try {
+    // PHP를 호출해서 폴더 안에 있는 모든 스티커 파일 목록을 가져옴
+    const response = await fetch("get_assets.php");
+    const result = await response.json();
+    
+    if (result.status === "success") {
+      stickerRow.innerHTML = ""; // 로딩 텍스트 제거
+      
+      result.data.forEach(src => {
+        const img = new Image();
+        img.src = src;
+        loadedStickerImgs[src] = img;
+
+        const btn = document.createElement("div");
+        btn.className = "sticker-btn";
+        btn.style.padding = "4px";
+        btn.innerHTML = `<img src="${src}" style="width:100%; height:100%; object-fit:contain; pointer-events:none;">`;
+        
+        btn.addEventListener("click", () => {
+          stickers.push({
+            type: "image",
+            src: src,
+            x: W / 2 + Math.random() * 40 - 20,
+            y: H / 2 + Math.random() * 40 - 20,
+            size: 80,
+            text: null, emoji: null
+          });
+          drawFrame();
+        });
+        stickerRow.appendChild(btn);
+      });
+    }
+  } catch (e) {
+    console.error("[SNAP] 스티커 목록을 불러오지 못했습니다.", e);
+    stickerRow.innerHTML = "스티커 로드 실패";
+  }
+}
+
+// 스크립트 실행 시 스티커 UI 로드
+initStickerUI();
 
 // ── INIT ──
 renderDots();

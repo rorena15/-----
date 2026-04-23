@@ -322,7 +322,9 @@ async function generateQR(dataUrl) {
       });
       
       qrL.style.display = "none"; 
-      qrC.style.display = "block";
+    qrC.style.display = "flex";
+    qrC.style.justifyContent = "center";
+    qrC.style.alignItems = "center";
     } else {
       qrL.textContent = "데이터 처리 오류";
     }

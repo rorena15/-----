@@ -143,7 +143,8 @@ header p { font-size: 16px; color: #888; margin-top: 6px; font-weight: 700; }
     height: auto;
     max-width: 100%;       /* 가로 넘침 방지 */
     max-height: 65vh;      /* 세로 높이에 비례하여 크기 축소 (핵심!) */
-    aspect-ratio: 300 / 680; /* 원본 비율 고정 */
+    object-fit: contain;
+    /* aspect-ratio: 300 / 680; 원본 비율 고정 */
     border-radius: 16px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.2);
     cursor: crosshair; touch-action: none;

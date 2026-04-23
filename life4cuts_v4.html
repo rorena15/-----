@@ -79,23 +79,25 @@
   <div class="decor-wrap">
     <div class="sidebar">
       <div class="panel">
-        <h3>프레임</h3>
-        <div class="frame-list">
-          <button class="frame-btn active" data-frame="classic">🎞 클래식</button>
-          <button class="frame-btn" data-frame="minimal">⬜ 미니멀</button>
-          <button class="frame-btn" data-frame="film">📷 필름</button>
-          <button class="frame-btn" data-frame="polaroid">🖼 폴라로이드</button>
-          <button class="frame-btn" data-frame="scrap">✂️ 스크랩북</button>
+        <h3>1. 레이아웃(구조) 선택</h3>
+        <div class="frame-gallery" id="layoutGallery">
+          <div class="frame-thumb active" data-layout="1_4"><p>세로 4컷</p></div>
+          <div class="frame-thumb" data-layout="2_2"><p>바둑판 2x2</p></div>
+          <div class="frame-thumb" data-layout="4_1"><p>가로 4컷 </p></div>
         </div>
       </div>
       <div class="panel">
-        <h3>프레임 배경 이미지</h3>
-        <button class="add-text-btn" id="bgImgBtn" style="margin-bottom:6px;">🖼 이미지 업로드</button>
-        <button class="add-text-btn" id="bgImgClearBtn">✕ 이미지 제거</button>
-        <input type="file" id="bgImgInput" accept="image/*" style="display:none;">
+        <h3>2. 테마(디자인) 선택</h3>
+        <div class="frame-gallery" id="themeGallery">
+          <div class="frame-thumb active" data-frame="classic"><p>클래식</p></div>
+          <div class="frame-thumb" data-frame="minimal"><p>미니멀</p></div>
+          <div class="frame-thumb" data-frame="film"><p>필름</p></div>
+          <div class="frame-thumb" data-frame="polaroid"><p>폴라로이드</p></div>
+          <div class="frame-thumb" data-frame="scrap"><p>스크랩</p></div>
+        </div>
       </div>
       <div class="panel">
-        <h3>배경색</h3>
+        <h3>3. 배경색 & 배경 이미지</h3>
         <div class="color-row">
           <div class="color-dot active" data-color="#ffffff" style="background:#fff;border-color:#ddd;"></div>
           <div class="color-dot" data-color="#fef3c7" style="background:#fef3c7;"></div>
@@ -104,24 +106,17 @@
           <div class="color-dot" data-color="#d1fae5" style="background:#d1fae5;"></div>
           <div class="color-dot" data-color="#1e293b" style="background:#1e293b;"></div>
         </div>
+        <button class="add-text-btn" id="bgImgBtn" style="margin-top:10px; margin-bottom:6px;">배경 이미지 업로드</button>
+        <button class="add-text-btn" id="bgImgClearBtn">✕ 배경 이미지 제거</button>
+        <input type="file" id="bgImgInput" accept="image/*" style="display:none;">
       </div>
       <div class="panel">
-        <h3>스티커</h3>
+        <h3>4. 스티커</h3>
         <div class="sticker-row">
-          <span class="sticker-btn" data-sticker="⭐">⭐</span>
-          <span class="sticker-btn" data-sticker="💫">💫</span>
-          <span class="sticker-btn" data-sticker="🌸">🌸</span>
-          <span class="sticker-btn" data-sticker="🎀">🎀</span>
-          <span class="sticker-btn" data-sticker="🌙">🌙</span>
-          <span class="sticker-btn" data-sticker="✨">✨</span>
-          <span class="sticker-btn" data-sticker="🍀">🍀</span>
-          <span class="sticker-btn" data-sticker="💛">💛</span>
-          <span class="sticker-btn" data-sticker="🦋">🦋</span>
-          <span class="sticker-btn" data-sticker="🌈">🌈</span>
-        </div>
+          </div>
       </div>
       <div class="panel text-input-wrap">
-        <h3>문구</h3>
+        <h3>5. 문구</h3>
         <input type="text" id="textInput" placeholder="문구 입력...">
         <button class="add-text-btn" id="addTextBtn">+ 추가</button>
       </div>

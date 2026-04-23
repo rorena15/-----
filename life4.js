@@ -174,8 +174,10 @@ toDecorBtn.onclick = () => { if(selectedOrder.length===4) { goToStep(3); request
 const LAYOUT_CONFIG = { "1_4": { mask: "assets/frame/1_4.png" }, "2_2": { mask: "assets/frame/2_2.png" }, "4_1": { mask: "assets/frame/4_1.png" } };
 const THEMES = { 
   classic: { defaultBg: "#ffffff", overlaySrc: null }, 
-  minimal: { defaultBg: "#1a1a2e", overlaySrc: "assets/frame/minimal_overlay.png" }, // 경로를 assets/frame으로 통일
-  film: { defaultBg: "#f59e0b", overlaySrc: "assets/frame/film_overlay.png" } 
+  minimal: { defaultBg: "#1a1a2e", overlaySrc: "assets/frame/minimal_overlay.png" }, 
+  film: { defaultBg: "#f59e0b", overlaySrc: "assets/frame/film_overlay.png" },
+  polaroid: { defaultBg: "#f4f4f4", overlaySrc: "assets/frame/polaroid_overlay.png" },
+  scrap: { defaultBg: "#eaeaea", overlaySrc: "assets/frame/scrap_overlay.png" }
 };
 
 const preloadedImages = {};

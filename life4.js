@@ -28,9 +28,16 @@ document.addEventListener("DOMContentLoaded", function() {
   const selectGrid = document.getElementById("selectGrid");
   const toDecorBtn = document.getElementById("toDecorBtn");
   
-  // HTML 로딩이 완료된 후 요소를 찾으므로 여기서 절대 에러가 나지 않습니다.
-  const canvas = document.getElementById("mainCanvas");
-  const ctx = canvas.getContext("2d"); 
+  // canvas/ctx는 page3 진입 시점에 가져옴 (일부 환경에서 숨겨진 요소 null 방지)
+  let canvas = null;
+  let ctx = null;
+  function getCanvas() {
+    if (!canvas) {
+      canvas = document.getElementById("mainCanvas");
+      ctx = canvas.getContext("2d");
+    }
+    return { canvas, ctx };
+  }
   
   const toSaveBtn = document.getElementById("toSaveBtn");
   const savePreview = document.getElementById("savePreview");
@@ -179,6 +186,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("resetBtn").addEventListener("click", () => {
     capturedPhotos = [];
     selectedOrder = [];
+    if (stream) stopCamera();
     renderDots();
   });
 
@@ -242,8 +250,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
   toDecorBtn.addEventListener("click", () => {
     if (selectedOrder.length !== 4) return;
-    drawFrame();
     goToStep(3);
+    attachCanvasEvents();
+    drawFrame();
   });
 
   // ── PAGE 3: DECORATE ──
@@ -258,11 +267,11 @@ document.addEventListener("DOMContentLoaded", function() {
   function getSlots() {
     const f = FRAMES[currentFrame];
     const p = f.padding, g = f.gap;
-    const bottomPad = bgImage ? p + 60 : p;
-    const slotW = (W - p * 2 - g) / 2;
+    const bottomPad = (f.label || bgImage) ? p + 24 : p;
+    const slotW = W - p * 2;
     const slotH = (H - p - bottomPad - g * 3) / 4;
     return Array.from({ length: 4 }, (_, i) => ({
-      x: p, y: p + i * (slotH + g), w: slotW * 2 + g, h: slotH, idx: i,
+      x: p, y: p + i * (slotH + g), w: slotW, h: slotH, idx: i,
     }));
   }
 
@@ -282,7 +291,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function drawFrame() {
-    ctx.clearRect(0, 0, W, H);
+    const { canvas, ctx } = getCanvas();
     const f = FRAMES[currentFrame];
 
     if (bgImage) {
@@ -435,51 +444,71 @@ document.addEventListener("DOMContentLoaded", function() {
     drawFrame();
   });
 
-  // sticker drag (mouse)
-  canvas.addEventListener("mousedown", function (e) {
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width / r.width, sy = canvas.height / r.height;
-    const px = (e.clientX - r.left) * sx, py = (e.clientY - r.top) * sy;
-    const idx = stickers.findIndex((s) => Math.abs(px - s.x) < 28 && Math.abs(py - s.y) < 28);
-    if (idx >= 0) {
-      dragging = idx;
-      dragOffset = { x: px - stickers[idx].x, y: py - stickers[idx].y };
-    }
-  });
-  canvas.addEventListener("mousemove", function (e) {
-    if (dragging === null) return;
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width / r.width, sy = canvas.height / r.height;
-    stickers[dragging].x = (e.clientX - r.left) * sx - dragOffset.x;
-    stickers[dragging].y = (e.clientY - r.top) * sy - dragOffset.y;
-    drawFrame();
-  });
-  canvas.addEventListener("mouseup", () => { dragging = null; });
+  // canvas 이벤트는 최초 1회만 등록 (page3 진입 시)
+  let canvasEventsAttached = false;
+  function attachCanvasEvents() {
+    if (canvasEventsAttached) return;
+    canvasEventsAttached = true;
+    const { canvas } = getCanvas();
 
-  // sticker drag (touch)
-  canvas.addEventListener("touchstart", function (e) {
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width / r.width, sy = canvas.height / r.height;
-    const px = (e.touches[0].clientX - r.left) * sx, py = (e.touches[0].clientY - r.top) * sy;
-    const idx = stickers.findIndex((s) => Math.abs(px - s.x) < 28 && Math.abs(py - s.y) < 28);
-    if (idx >= 0) {
-      dragging = idx;
-      dragOffset = { x: px - stickers[idx].x, y: py - stickers[idx].y };
+    // sticker drag (mouse)
+    canvas.addEventListener("mousedown", function (e) {
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width, sy = canvas.height / r.height;
+      const px = (e.clientX - r.left) * sx, py = (e.clientY - r.top) * sy;
+      const idx = stickers.findIndex((s) => Math.abs(px - s.x) < 28 && Math.abs(py - s.y) < 28);
+      if (idx >= 0) {
+        dragging = idx;
+        dragOffset = { x: px - stickers[idx].x, y: py - stickers[idx].y };
+      }
+    });
+    canvas.addEventListener("mousemove", function (e) {
+      if (dragging === null) return;
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width, sy = canvas.height / r.height;
+      stickers[dragging].x = (e.clientX - r.left) * sx - dragOffset.x;
+      stickers[dragging].y = (e.clientY - r.top) * sy - dragOffset.y;
+      drawFrame();
+    });
+    canvas.addEventListener("mouseup", () => { dragging = null; });
+    // 더블클릭으로 스티커/텍스트 삭제
+    canvas.addEventListener("dblclick", function (e) {
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width, sy = canvas.height / r.height;
+      const px = (e.clientX - r.left) * sx, py = (e.clientY - r.top) * sy;
+      const idx = stickers.findIndex((s) => Math.abs(px - s.x) < 28 && Math.abs(py - s.y) < 28);
+      if (idx >= 0) {
+        stickers.splice(idx, 1);
+        drawFrame();
+      }
+    });
+
+    // sticker drag (touch)
+    canvas.addEventListener("touchstart", function (e) {
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width, sy = canvas.height / r.height;
+      const px = (e.touches[0].clientX - r.left) * sx, py = (e.touches[0].clientY - r.top) * sy;
+      const idx = stickers.findIndex((s) => Math.abs(px - s.x) < 28 && Math.abs(py - s.y) < 28);
+      if (idx >= 0) {
+        dragging = idx;
+        dragOffset = { x: px - stickers[idx].x, y: py - stickers[idx].y };
+        e.preventDefault();
+      }
+    }, { passive: false });
+    canvas.addEventListener("touchmove", function (e) {
+      if (dragging === null) return;
+      const r = canvas.getBoundingClientRect();
+      const sx = canvas.width / r.width, sy = canvas.height / r.height;
+      stickers[dragging].x = (e.touches[0].clientX - r.left) * sx - dragOffset.x;
+      stickers[dragging].y = (e.touches[0].clientY - r.top) * sy - dragOffset.y;
+      drawFrame();
       e.preventDefault();
-    }
-  }, { passive: false });
-  canvas.addEventListener("touchmove", function (e) {
-    if (dragging === null) return;
-    const r = canvas.getBoundingClientRect();
-    const sx = canvas.width / r.width, sy = canvas.height / r.height;
-    stickers[dragging].x = (e.touches[0].clientX - r.left) * sx - dragOffset.x;
-    stickers[dragging].y = (e.touches[0].clientY - r.top) * sy - dragOffset.y;
-    drawFrame();
-    e.preventDefault();
-  }, { passive: false });
-  canvas.addEventListener("touchend", () => { dragging = null; });
+    }, { passive: false });
+    canvas.addEventListener("touchend", () => { dragging = null; });
+  }
 
   toSaveBtn.addEventListener("click", () => {
+    const { canvas } = getCanvas();
     const dataUrl = canvas.toDataURL("image/png");
     savePreview.src = dataUrl;
     goToStep(4);
@@ -488,6 +517,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // ── PAGE 4: SAVE ──
   dlBtn.addEventListener("click", function () {
+    const { canvas } = getCanvas();
     const link = document.createElement("a");
     link.download = "my_life4cuts.png";
     link.href = canvas.toDataURL("image/png");
@@ -573,6 +603,8 @@ document.addEventListener("DOMContentLoaded", function() {
     tmpDiv.style.display = "none";
     document.body.appendChild(tmpDiv);
 
+    qrLoading.textContent = "⚠️ 업로드 실패 — 직접 저장 이용";
+
     const msg = "이미지를 직접 저장 버튼을 이용해 주세요 😊";
     new QRCode(tmpDiv, {
       text: msg,
@@ -601,7 +633,6 @@ document.addEventListener("DOMContentLoaded", function() {
         qrCanvas.style.display = "block";
       }
       document.body.removeChild(tmpDiv);
-      qrLoading.textContent = "⚠️ 업로드 실패 — 직접 저장 이용";
     }, 300);
   }
 

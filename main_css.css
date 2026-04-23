@@ -306,7 +306,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
 .qr-loading {
     font-size: 11px; color: #bbb; font-weight: 700;
 }
-.qr-dl-btn {
+.qr-dl-btn, #qrDlBtn {
     margin-top: 12px; width: 100%;
     padding: 10px; border-radius: 12px;
     background: var(--purple); color: #fff;
@@ -314,7 +314,7 @@ header p { font-size: 13px; color: #888; margin-top: 4px; }
     cursor: pointer; font-family: 'Nunito', sans-serif;
     transition: all .15s;
 }
-.qr-dl-btn:hover { background: #7c72f0; }
+.qr-dl-btn:hover, #qrDlBtn:hover { background: #7c72f0; }
 .qr-share-row {
     display: flex; gap: 8px; margin-top: 8px;
 }

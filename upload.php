@@ -46,18 +46,32 @@ if (isset($data['image'])) {
 
     $fileName = 'life4cuts_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $filePath = $uploadDir . $fileName;
+}
+if (file_put_contents($filePath, $imgData)) {
+    // ── [지능형 주소 융합 로직] ──
+    $host = $_SERVER['HTTP_HOST'];
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
 
-    if (file_put_contents($filePath, $imgData)) {
-        $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
-        $host = $_SERVER['HTTP_HOST'];
-        $uri = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
-        $fileUrl = $protocol . "://" . $host . $uri . "/" . $filePath;
-
-        echo json_encode(['status' => 'success', 'url' => $fileUrl]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Save failed']);
+    // 1. ngrok 터널링 감지 (가장 우선순위 높음)
+    if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'];
+        // ngrok은 보통 https를 사용하므로 프로토콜 강제 지정 가능
+        $protocol = (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) ? $_SERVER['HTTP_X_FORWARDED_PROTO'] : "https";
+    } 
+    // 2. 터널링이 없고 운영자가 localhost로 접속 중인 경우 LAN IP로 치환
+    else if (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false) {
+        $host = gethostbyname(gethostname());
+        $port = $_SERVER['SERVER_PORT'];
+        if ($port != '80' && $port != '443') {
+            $host .= ":" . $port;
+        }
     }
+
+    $uri = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
+    $fileUrl = $protocol . "://" . $host . $uri . "/" . $filePath;
+
+    echo json_encode(['status' => 'success', 'url' => $fileUrl]);
 } else {
-    echo json_encode(['status' => 'error', 'message' => 'No data']);
+    echo json_encode(['status' => 'error', 'message' => 'Save failed']);
 }
 ?>

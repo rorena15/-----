@@ -10,7 +10,7 @@ let dragging = null;
 let dragOffset = { x: 0, y: 0 };
 
 const W = 300, H = 680;
-
+const shutterSound = new Audio("shutter.mp3");
 // ── ELEMENTS ──
 const flash = document.getElementById("flash");
 const camArea = document.getElementById("camArea");
@@ -97,6 +97,8 @@ function shootOne(slotIdx, onDone) {
       clearInterval(iv);
       countdownEl.style.display = "none";
       doFlash();
+      shutterSound.currentTime = 0;
+      shutterSound.play().catch(e => console.warn("터치 전 사운드 방어됨"));
       const tmp = document.createElement("canvas");
       tmp.width = video.videoWidth;
       tmp.height = video.videoHeight;
@@ -253,25 +255,45 @@ toDecorBtn.addEventListener("click", () => {
 });
 
 // ── PAGE 3: DECORATE ──
+// 1. 사진 위치 완전 고정 (어떤 프레임이든 사진 위치는 불변)
+const FIXED_LAYOUT = { padding: 20, gap: 10, bottomPad: 80, radius: 4 };
+
+// 2. PNG 오버레이 방식 프리셋
 const FRAMES = {
-  classic: { padding: 20, gap: 10, borderRadius: 6, border: { color: "#222", width: 2 }, label: "CLASSIC" },
-  minimal: { padding: 24, gap: 8, borderRadius: 0, border: { color: "transparent", width: 0 }, label: "" },
-  film: { padding: 14, gap: 6, borderRadius: 0, border: { color: "#f59e0b", width: 3 }, label: "35mm FILM" },
-  polaroid: { padding: 18, gap: 14, borderRadius: 4, border: { color: "#e5e7eb", width: 8 }, label: "" },
-  scrap: { padding: 16, gap: 12, borderRadius: 8, border: { color: "#6366f1", width: 2, dashed: true }, label: "✂ SCRAP" },
+  classic: { defaultBg: "#ffffff", overlaySrc: null },
+  minimal: { defaultBg: "#1a1a2e", overlaySrc: "frames/minimal_overlay.png" },
+  film: { defaultBg: "#f59e0b", overlaySrc: "frames/film_overlay.png" },
+  polaroid: { defaultBg: "#e5e7eb", overlaySrc: "frames/polaroid_overlay.png" },
+  scrap: { defaultBg: "#e0e7ff", overlaySrc: "frames/scrap_overlay.png" }
 };
+const frameImages = {};
 
 function getSlots() {
-  const f = FRAMES[currentFrame];
-  const p = f.padding, g = f.gap;
-  const bottomPad = (f.label || bgImage) ? p + 24 : p;
+  const p = FIXED_LAYOUT.padding, g = FIXED_LAYOUT.gap;
   const slotW = W - p * 2;
-  const slotH = (H - p - bottomPad - g * 3) / 4;
+  const slotH = (H - p - FIXED_LAYOUT.bottomPad - g * 3) / 4;
   return Array.from({ length: 4 }, (_, i) => ({
     x: p, y: p + i * (slotH + g), w: slotW, h: slotH, idx: i,
   }));
 }
 
+// 3. 파일 누락 방지 (예외 처리)
+function preloadFrames() {
+  Object.keys(FRAMES).forEach(key => {
+    const src = FRAMES[key].overlaySrc;
+    if (src) {
+      const img = new Image();
+      img.onload = () => { frameImages[key] = img; };
+      img.onerror = () => { 
+        console.warn(`[SNAP] 프레임 로드 실패 (기본색으로 대체): ${src}`);
+        frameImages[key] = null; // 파일이 없어도 뻗지 않음
+      };
+      img.src = src;
+    }
+  });
+}
+
+preloadFrames();
 function roundRect(c, x, y, w, h, r) {
   if (r <= 0) { c.beginPath(); c.rect(x, y, w, h); return; }
   c.beginPath();
@@ -292,45 +314,30 @@ function drawFrame() {
   if (!canvas || !ctx) return;
   const f = FRAMES[currentFrame];
 
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. 배경색 (파일이 없으면 이 색상으로 대체됨)
+  ctx.fillStyle = bgColor !== "#ffffff" ? bgColor : f.defaultBg;
+  roundRect(ctx, 0, 0, W, H, FIXED_LAYOUT.radius);
+  ctx.fill();
+
+  // 2. 사용자 업로드 배경 이미지
   if (bgImage) {
     ctx.save();
-    roundRect(ctx, 0, 0, W, H, currentFrame === "scrap" ? 16 : currentFrame === "classic" ? 12 : 4);
+    roundRect(ctx, 0, 0, W, H, FIXED_LAYOUT.radius);
     ctx.clip();
     const scale = Math.max(W / bgImage.width, H / bgImage.height);
     const dw = bgImage.width * scale, dh = bgImage.height * scale;
     ctx.drawImage(bgImage, (W - dw) / 2, (H - dh) / 2, dw, dh);
     ctx.restore();
-  } else {
-    ctx.fillStyle = bgColor;
-    roundRect(ctx, 0, 0, W, H, currentFrame === "scrap" ? 16 : currentFrame === "classic" ? 12 : 4);
-    ctx.fill();
   }
 
-  if (currentFrame === "film") {
-    ctx.fillStyle = "#111";
-    ctx.fillRect(0, 0, W, 12);
-    ctx.fillRect(0, H - 12, W, 12);
-    for (let x = 8; x < W; x += 18) {
-      ctx.fillStyle = "#fff";
-      roundRect(ctx, x, 2, 10, 8, 2);
-      ctx.fill();
-      roundRect(ctx, x, H - 10, 10, 8, 2);
-      ctx.fill();
-    }
-  }
-  if (currentFrame === "scrap") {
-    ctx.strokeStyle = "#c7d2fe";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(4, 4, W - 8, H - 8);
-    ctx.setLineDash([]);
-  }
-
+  // 3. 고정된 위치에 4컷 사진 넣기
   const slots = getSlots();
   slots.forEach((s, i) => {
     ctx.save();
     ctx.beginPath();
-    roundRect(ctx, s.x, s.y, s.w, s.h, f.borderRadius);
+    roundRect(ctx, s.x, s.y, s.w, s.h, FIXED_LAYOUT.radius);
     ctx.clip();
     const photoIdx = selectedOrder[i];
     const img = capturedPhotos[photoIdx];
@@ -339,39 +346,24 @@ function drawFrame() {
       const dw = img.width * scale, dh = img.height * scale;
       ctx.drawImage(img, s.x + (s.w - dw) / 2, s.y + (s.h - dh) / 2, dw, dh);
     } else {
-      ctx.fillStyle = "rgba(0,0,0,0.04)";
+      ctx.fillStyle = "rgba(0,0,0,0.1)";
       ctx.fill();
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.font = "bold 12px Nunito,sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${i + 1}번`, s.x + s.w / 2, s.y + s.h / 2);
     }
     ctx.restore();
-    if (f.border.width > 0 && f.border.color !== "transparent") {
-      ctx.save();
-      if (f.border.dashed) ctx.setLineDash([6, 3]);
-      ctx.strokeStyle = f.border.color;
-      ctx.lineWidth = f.border.width;
-      ctx.beginPath();
-      roundRect(ctx, s.x, s.y, s.w, s.h, f.borderRadius);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
   });
 
-  if (f.label) {
-    ctx.font = "bold 10px monospace";
-    ctx.fillStyle = bgColor === "#1e293b" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.22)";
-    ctx.textAlign = "center";
-    ctx.fillText(f.label, W / 2, H - 6);
+  // 4. [예외 처리 강화] 프레임 PNG 덮어쓰기
+  if (f.overlaySrc && frameImages[currentFrame]) {
+    try {
+      ctx.drawImage(frameImages[currentFrame], 0, 0, W, H);
+    } catch (e) {
+      console.error("[SNAP] 오버레이 렌더링 에러:", e);
+    }
   }
 
+  // 5. 스티커 및 텍스트
   stickers.forEach((st) => {
     ctx.save();
-    ctx.globalAlpha = 1.0;
-    ctx.globalCompositeOperation = "source-over";
     if (st.emoji) {
       ctx.font = `${st.size}px serif`;
       ctx.textAlign = "center";
@@ -379,8 +371,8 @@ function drawFrame() {
       ctx.fillText(st.emoji, st.x, st.y);
     }
     if (st.text) {
-      ctx.font = "bold 14px Nunito,sans-serif";
-      ctx.fillStyle = bgColor === "#1e293b" ? "#fff" : "#222";
+      ctx.font = "bold 16px Nunito,sans-serif";
+      ctx.fillStyle = (f.defaultBg === "#1a1a2e" || f.defaultBg === "#f59e0b") ? "#fff" : "#222";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(st.text, st.x, st.y);

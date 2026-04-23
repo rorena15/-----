@@ -26,10 +26,12 @@ const toSelectBtn = document.getElementById("toSelectBtn");
 const selectGrid = document.getElementById("selectGrid");
 const toDecorBtn = document.getElementById("toDecorBtn");
 
-// defer 덕분에 DOM이 완전히 준비된 후 실행되므로 바로 가져올 수 있음
-const canvas = document.getElementById("mainCanvas");
-const ctx = canvas.getContext("2d");
-function getCanvas() { return { canvas, ctx }; }
+// canvas/ctx: 사용 시점마다 직접 참조 (전역 선언 없음)
+function getCanvas() {
+  const canvas = document.getElementById("mainCanvas");
+  if (!canvas) return { canvas: null, ctx: null };
+  return { canvas, ctx: canvas.getContext("2d") };
+}
 
 const toSaveBtn = document.getElementById("toSaveBtn");
 const savePreview = document.getElementById("savePreview");

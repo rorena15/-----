@@ -25,7 +25,7 @@
 
 ---
 
-## 💻 2. 기술 스택 (Technical Stack)
+##  2. 기술 스택 (Technical Stack)
 
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript
 - **Graphics:** HTML5 Canvas API (이미지 병합 및 오버레이)
@@ -35,7 +35,7 @@
 
 ---
 
-## 🚀 3. 향후 개발 로드맵
+##  3. 향후 개발 로드맵
 
 1.  **Phase 1 (QR 시스템 개선):** 기존 광고 포함 호스팅 제거 및 Imgur/Cloudinary 등 Clean API 연동
 2.  **Phase 2 (프레임 시스템 개편):** PNG 이미지 기반 오버레이 로직 구현 및 썸네일 선택 UI 적용

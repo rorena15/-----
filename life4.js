@@ -599,7 +599,7 @@ dlBtn.addEventListener("click", function () {
 // ── QR CODE GENERATION ──
 let currentDataUrl = "";
 
-function generateQR(dataUrl) {
+async function generateQR(dataUrl) {
   currentDataUrl = dataUrl;
   const qrBox = document.getElementById("qrBox");
   const qrLoading = document.getElementById("qrLoading");
@@ -608,33 +608,24 @@ function generateQR(dataUrl) {
   qrLoading.style.display = "block";
   qrCanvas.style.display = "none";
 
-  // Upload image to a free temporary hosting service (transfer.sh)
-  // Convert dataUrl to blob
-  fetch(dataUrl)
-    .then((r) => r.blob())
-    .then((blob) => {
-      const formData = new FormData();
-      formData.append("file", blob, "life4cuts.png");
-      return fetch("https://tmpfiles.org/api/v1/upload", {
-        method: "POST",
-        body: formData,
-      });
-    })
-    .then((r) => r.json())
-    .then((data) => {
-      // tmpfiles returns {"status":"success","data":{"url":"https://tmpfiles.org/XXXXX/life4cuts.png"}}
-      if (data.status === "success") {
-        const url = data.data.url;
-        window._qrUrl = url;
-        makeQRCanvas(url);
-      } else {
-        throw new Error("upload failed");
-      }
-    })
-    .catch(() => {
-      // Fallback: make QR from base64 data directly (long but functional)
-      fallbackQR();
+  try {
+    const response = await fetch("upload.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: dataUrl }),
     });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+      window._qrUrl = data.url;
+      makeQRCanvas(data.url);
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (err) {
+    fallbackQR();
+  }
 }
 
 function makeQRCanvas(url) {

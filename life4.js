@@ -9,7 +9,7 @@ let bgImage = null;
 let stickers = [];
 let dragging = null;
 let dragOffset = { x: 0, y: 0 };
-const shutterSound = new Audio("shutter.mp3");
+const shutterSound = new Audio("shutter.mp3"); // [참고] 경로가 다를 경우 "assets/sound/shutter.mp3" 등으로 수정하세요.
 
 // ── [PICKMEM TECH] 자동 슬롯 감지 엔진 ──
 let currentDetectedSlots = []; 
@@ -89,10 +89,6 @@ function renderDots() {
     progressDots.appendChild(d);
   }
   toSelectBtn.classList.toggle("ready", capturedPhotos.length >= 6);
-  const done = capturedPhotos.length;
-  if (done >= 6) shootHint.textContent = "6장 완성! 다음으로 넘어가세요 ✅";
-  else if (stream) shootHint.textContent = `${done}/6장 촬영됨`;
-  else shootHint.textContent = `${done}/6장 완료 — 카메라를 켜거나 파일을 업로드하세요`;
 }
 
 async function startCamera() {
@@ -139,7 +135,7 @@ startCamBtn.onclick = startCamera;
 stopCamBtn.onclick = stopCamera;
 shootBtn.onclick = startShooting;
 
-// [복구] 업로드 및 초기화 기능
+// [복구] 업로드 및 초기화 버튼 기능
 document.getElementById("uploadBtn").onclick = () => document.getElementById("fileInput").click();
 document.getElementById("fileInput").onchange = function () {
   Array.from(this.files).forEach(file => {
@@ -167,7 +163,6 @@ function buildSelectGrid() {
         b.textContent = p >= 0 ? (p + 1) + "번째" : "";
       });
       toDecorBtn.classList.toggle("ready", selectedOrder.length === 4);
-      document.querySelector(".select-info span").textContent = `${selectedOrder.length}/4장`;
     };
     selectGrid.appendChild(card);
   });
@@ -175,9 +170,13 @@ function buildSelectGrid() {
 toSelectBtn.onclick = () => { if(capturedPhotos.length>=6) { buildSelectGrid(); goToStep(2); } };
 toDecorBtn.onclick = () => { if(selectedOrder.length===4) { goToStep(3); requestAnimationFrame(() => { attachCanvasEvents(); drawFrame(); }); } };
 
-// ── 3. 꾸미기 ──
+// ── 3. 꾸미기 (404 에러 방지를 위해 경로 수정) ──
 const LAYOUT_CONFIG = { "1_4": { mask: "assets/frame/1_4.png" }, "2_2": { mask: "assets/frame/2_2.png" }, "4_1": { mask: "assets/frame/4_1.png" } };
-const THEMES = { classic: { defaultBg: "#ffffff", overlaySrc: null }, minimal: { defaultBg: "#1a1a2e", overlaySrc: "frames/minimal_overlay.png" }, film: { defaultBg: "#f59e0b", overlaySrc: "frames/film_overlay.png" } };
+const THEMES = { 
+  classic: { defaultBg: "#ffffff", overlaySrc: null }, 
+  minimal: { defaultBg: "#1a1a2e", overlaySrc: "assets/frame/minimal_overlay.png" }, // 경로를 assets/frame으로 통일
+  film: { defaultBg: "#f59e0b", overlaySrc: "assets/frame/film_overlay.png" } 
+};
 
 const preloadedImages = {};
 function preloadAssets() {
@@ -235,7 +234,7 @@ async function drawFrame() {
   });
 }
 
-// ── 4. 인터랙션 (TypeError 수정) ──
+// ── 4. 인터랙션 (TypeError 완벽 수정) ──
 let canvasEventsAttached = false;
 function attachCanvasEvents() {
   if (canvasEventsAttached) return;
@@ -268,14 +267,14 @@ function attachCanvasEvents() {
   canvasEventsAttached = true;
 }
 
-// ── 5. 저장 및 동적 사이즈 대응 QR ──
+// ── 5. 저장 및 광고 제거 QR (수정됨) ──
 toSaveBtn.onclick = () => {
   const { canvas } = getCanvas();
   if (!canvas) return;
   
-  // [수정] 미리보기 이미지의 소스뿐만 아니라 스타일도 동적으로 조정하여 왜곡 방지
   savePreview.src = canvas.toDataURL("image/png");
   
+  // 가로/세로 비율에 따른 미리보기 스타일 설정
   if (canvas.width > canvas.height) {
     savePreview.style.width = "100%";
     savePreview.style.height = "auto";
@@ -293,12 +292,44 @@ dlBtn.onclick = () => { const a = document.createElement("a"); a.download = "my_
 
 async function generateQR(dataUrl) {
   const qrL = document.getElementById("qrLoading"), qrC = document.getElementById("qrCanvas");
-  qrL.style.display = "block"; qrC.style.display = "none";
+  if (!qrL || !qrC) return;
+
+  qrL.style.display = "block"; 
+  qrC.style.display = "none";
+  qrC.innerHTML = ""; // 이전 QR 초기화
+
   try {
-    const res = await fetch("upload.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: dataUrl }) });
+    const res = await fetch("upload.php", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ image: dataUrl }) 
+    });
     const data = await res.json();
-    if (data.status === "success") { qrC.innerHTML = ""; new QRCode(qrC, { text: data.url, width: 150, height: 150 }); qrL.style.display = "none"; qrC.style.display = "block"; }
-  } catch (e) { qrL.textContent = "저장 실패"; }
+    
+    // 라이브러리 존재 여부 및 데이터 상태 확인
+    if (data.status === "success" && data.url) {
+      if (typeof QRCode === "undefined") {
+        qrL.textContent = "QRCode 라이브러리 없음";
+        return;
+      }
+      
+      // 광고 없는 순수 직접 주소로 QR 생성
+      new QRCode(qrC, { 
+        text: data.url, 
+        width: 150, 
+        height: 150,
+        correctLevel : QRCode.CorrectLevel.H 
+      });
+      
+      qrL.style.display = "none"; 
+      qrC.style.display = "block";
+    } else {
+      qrL.textContent = "데이터 처리 오류";
+    }
+  } catch (e) { 
+    qrL.textContent = "네트워크 연결 실패";
+    console.error("QR Error:", e);
+  }
 }
 restartBtn.onclick = () => location.reload();
 

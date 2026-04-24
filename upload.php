@@ -68,10 +68,11 @@ if (file_put_contents($filePath, $imgData)) {
     }
 
     $uri = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
-    $fileUrl = $protocol . "://" . $host . $uri . "/" . $filePath;
+        
+        $fileUrl = $protocol . "://" . $host . $uri . "/download.php?id=" . $fileName;
 
-    echo json_encode(['status' => 'success', 'url' => $fileUrl]);
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Save failed']);
-}
+        echo json_encode(['status' => 'success', 'url' => $fileUrl]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Save failed']);
+    }
 ?>

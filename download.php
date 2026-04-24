@@ -17,7 +17,7 @@ if (!file_exists($filePath)) {
 
 if (time() - filemtime($filePath) > $expireSeconds) {
     header("HTTP/1.0 410 Gone");
-    die("<h1>만료된 링크입니다.</h1><p>보안을 위해 사진 다운로드 기간(10분)이 지났습니다.</p>");
+    die("<h1>만료된 링크입니다.</h1><p>보안을 위해 사진 다운로드 기간(60분)이 지났습니다.</p>");
 }
 
 $finfo = new finfo(FILEINFO_MIME_TYPE);
